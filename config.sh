@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 
 # Kernel name
-KERNEL_NAME="GrayRavens-Redemption-V7"
+KERNEL_NAME="GrayRavens-Mainstream-V2"
 # Kernel Build variables
-USER="ShadowbyePrjkt_Hyperion"
-HOST="KuchibaChisa_Hyperion"
+USER="ShadowbyePrjkt"
+HOST="KuchibaChisa"
 TIMEZONE="Asia/Jakarta"
 # AnyKernel
 ANYKERNEL_REPO="https://github.com/ShadowbytePrjkt/GKI-anykernel"
 ANYKERNEL_BRANCH="gki"
 # Kernel Source
-KERNEL_REPO="https://github.com/XTENSEI/android_kernel_common-5.10"
+KERNEL_REPO="https://github.com/ramabondanp/android_kernel_common-5.10"
 KERNEL_BRANCH="android12-5.10-staging"
 KERNEL_DEFCONFIG="gki_defconfig"
 # Release repository
