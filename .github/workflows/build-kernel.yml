@@ -1,0 +1,80 @@
+name: Build kernel
+
+on:
+  workflow_dispatch:
+    inputs:
+      ksu_variant:
+        description: 'KernelSU variant'
+        type: choice
+        options:
+          - KOWSU
+          - KSUN
+        default: KOWSU
+      kernel_ref:
+        description: 'kernel branch / tag / SHA to build'
+        type: string
+        default: android12-5.10
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout workflow repo (build.sh lives here)
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y --no-install-recommends \
+            bc bison flex build-essential libssl-dev libelf-dev \
+            cpio kmod rsync zip patch curl ca-certificates \
+            python3 python3-pip git
+
+      - name: Cache LLVM toolchain
+        id: cache-clang
+        uses: actions/cache@v4
+        with:
+          path: ~/work/android-kernel/toolchain/clang-12.0.1
+          key: llvm-12.0.1-x86_64
+
+      - name: Shallow-clone kernel source
+        run: |
+          git clone --depth=1 --branch "${{ inputs.kernel_ref }}" \
+            https://github.com/XTENSEI/kernel_common_5.10 kernel
+
+      - name: Apply KernelSU (${{ inputs.ksu_variant }})
+        working-directory: kernel
+        run: |
+          if [ "${{ inputs.ksu_variant }}" = "KOWSU" ]; then
+            curl -LSs "https://raw.githubusercontent.com/KOWX712/KernelSU/main/kernel/setup.sh" | bash -s master
+            sed -i '$a CONFIG_KSU=y\nCONFIG_KSU_MANUAL_SU=n\nCONFIG_KSU_SUSFS=n' arch/arm64/configs/gki_defconfig
+          else
+            curl -LSs "https://raw.githubusercontent.com/pershoot/KernelSU-Next/dev-susfs/kernel/setup.sh" | bash -s dev-susfs
+            sed -i '$a CONFIG_KSU=y\nCONFIG_KSU_MANUAL_SU=n\nCONFIG_KSU_SUSFS=y' arch/arm64/configs/gki_defconfig
+          fi
+
+      - name: Apply SUSFS patches (KSUN only)
+        if: inputs.ksu_variant == 'KSUN'
+        working-directory: kernel
+        run: |
+          git clone https://gitlab.com/simonpunk/susfs4ksu/ -b gki-android12-5.10 sus
+          rm -rf sus/.git
+          susfs=sus/kernel_patches
+          cp -r "$susfs/fs" .
+          cp -r "$susfs/include" .
+          cp -r "$susfs/50_add_susfs_in_gki-android12-5.10.patch" .
+          patch -p1 < 50_add_susfs_in_gki-android12-5.10.patch
+
+      - name: Run build.sh
+        working-directory: kernel
+        run: |
+          cp "$GITHUB_WORKSPACE/build.sh" .
+          chmod +x build.sh
+          ./build.sh
+
+      - name: Upload kernel image
+        uses: actions/upload-artifact@v4
+        with:
+          name: Image-${{ inputs.ksu_variant }}-${{ inputs.kernel_ref }}
+          path: kernel/out/arch/arm64/boot/Image
+          if-no-files-found: error
