@@ -3,11 +3,13 @@ on:
   workflow_dispatch:
     inputs:
       ksu_variant:
-        description: 'KernelSU variant'
+        description: 'KernelSU variant (VANILLA = build with no KSU at all)'
         type: choice
         options:
           - KOWSU
           - KSUN
+          - KSUN_ALL_MANAGERS
+          - VANILLA
         default: KOWSU
       kernel_ref:
         description: 'kernel branch / tag / SHA to build'
@@ -46,18 +48,29 @@ jobs:
             https://github.com/XTENSEI/kernel_common_5.10 kernel
 
       - name: Apply KernelSU (${{ inputs.ksu_variant }})
+        if: inputs.ksu_variant != 'VANILLA'
         working-directory: kernel
         run: |
           if [ "${{ inputs.ksu_variant }}" = "KOWSU" ]; then
             curl -LSs "https://raw.githubusercontent.com/KOWX712/KernelSU/main/kernel/setup.sh" | bash -s master
             sed -i '$a CONFIG_KSU=y\nCONFIG_KSU_MANUAL_SU=n\nCONFIG_KSU_SUSFS=n' arch/arm64/configs/gki_defconfig
           else
+            # KSUN and KSUN_ALL_MANAGERS share the same KernelSU-Next dev-susfs base.
             curl -LSs "https://raw.githubusercontent.com/pershoot/KernelSU-Next/dev-susfs/kernel/setup.sh" | bash -s dev-susfs
             sed -i '$a CONFIG_KSU=y\nCONFIG_KSU_MANUAL_SU=n\nCONFIG_KSU_SUSFS=y' arch/arm64/configs/gki_defconfig
           fi
 
-      - name: Apply SUSFS patches (KSUN only)
-        if: inputs.ksu_variant == 'KSUN'
+      - name: Apply All Managers Support patch (KSUN_ALL_MANAGERS only)
+        if: inputs.ksu_variant == 'KSUN_ALL_MANAGERS'
+        working-directory: kernel
+        run: |
+          echo "Patch All Managers Support..."
+          curl -LSs "https://raw.githubusercontent.com/XTENSEI/gki-builder/refs/heads/6.x/kernel-patches/ksu/ksun-add-more-managers-support.patch" \
+            -o /tmp/ksun-add-more-managers-support.patch
+          cd KernelSU-Next && patch -p1 < /tmp/ksun-add-more-managers-support.patch && cd ..
+
+      - name: Apply SUSFS patches (KSUN-based variants only)
+        if: inputs.ksu_variant == 'KSUN' || inputs.ksu_variant == 'KSUN_ALL_MANAGERS'
         working-directory: kernel
         run: |
           git clone https://gitlab.com/simonpunk/susfs4ksu/ -b gki-android12-5.10 sus
