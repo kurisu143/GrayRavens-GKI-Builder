@@ -12,7 +12,7 @@ export LLVM=1
 export LLVM_IAS=1
 export LLVM_VER=12.0.1
 export KBUILD_BUILD_USER="GrayRavens-Team"
-export KBUILD_BUILD_HOST="ZenithXHikari-KasumiThermal"
+export KBUILD_BUILD_HOST="ZenithXHikari-KasumiThermal-IyashiThrottle"
 
 # Check and download Clang if not present
 CLANG_PATH="${HOME}/work/android-kernel/toolchain/clang-${LLVM_VER}"
