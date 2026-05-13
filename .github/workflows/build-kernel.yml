@@ -67,7 +67,17 @@ jobs:
           echo "Patch All Managers Support..."
           curl -LSs "https://raw.githubusercontent.com/XTENSEI/gki-builder/refs/heads/6.x/kernel-patches/ksu/ksun-add-more-managers-support.patch" \
             -o /tmp/ksun-add-more-managers-support.patch
-          cd KernelSU-Next && patch -p1 < /tmp/ksun-add-more-managers-support.patch && cd ..
+          if [ -d KernelSU-Next ]; then
+            cd KernelSU-Next
+            echo "Current KernelSU-Next branch: $(git branch --show-current)"
+            cat kernel/Kbuild | grep MANAGER_LIST
+            patch -p1 < /tmp/ksun-add-more-managers-support.patch
+            echo "Patch applied. New MANAGER_LIST:"
+            cat kernel/Kbuild | grep MANAGER_LIST
+          else
+            echo "ERROR: KernelSU-Next directory not found!"
+            exit 1
+          fi
 
       - name: Apply SUSFS patches (KSUN-based variants only)
         if: inputs.ksu_variant == 'KSUN' || inputs.ksu_variant == 'KSUN_ALL_MANAGERS'
