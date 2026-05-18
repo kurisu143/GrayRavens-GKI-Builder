@@ -11,6 +11,13 @@ on:
           - KSUN_ALL_MANAGERS
           - VANILLA
         default: KOWSU
+      clang_variant:
+        description: 'Clang toolchain to use'
+        type: choice
+        options:
+          - CLANG_12
+          - NEUTRON_19
+        default: CLANG_12
       kernel_ref:
         description: 'kernel branch / tag / SHA to build'
         type: string
@@ -18,7 +25,7 @@ on:
       kernel_name:
         description: 'Kernel zip name (without .zip)'
         type: string
-        default: GrayRavens-Zenithed-V5.9-Premura
+        default: GrayRavens-Zenithed
 
 jobs:
   build:
@@ -33,14 +40,39 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             bc bison flex build-essential libssl-dev libelf-dev \
             cpio kmod rsync zip patch curl ca-certificates \
-            python3 python3-pip python3-lxml git
+            python3 python3-pip python3-lxml git wget
 
-      - name: Cache LLVM toolchain
-        id: cache-clang
+      - name: Cache Clang 12 (kernel.org)
+        if: inputs.clang_variant == 'CLANG_12'
+        id: cache-clang-12
         uses: actions/cache@v4
         with:
-          path: ~/work/android-kernel/toolchain/clang-12.0.1
+          path: ~/toolchain/clang-12.0.1
           key: llvm-12.0.1-x86_64
+
+      - name: Download Clang 12 (if not cached)
+        if: inputs.clang_variant == 'CLANG_12' && steps.cache-clang-12.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/toolchain/clang-12.0.1
+          curl -L "https://mirrors.edge.kernel.org/pub/tools/llvm/files/llvm-12.0.1-x86_64.tar.gz" \
+            | tar -xz --strip-components=1 -C ~/toolchain/clang-12.0.1
+          echo "Clang 12.0.1 downloaded."
+
+      - name: Download Neutron Clang 19
+        if: inputs.clang_variant == 'NEUTRON_19'
+        run: |
+          mkdir -p ~/toolchain/neutron-clang
+          bash <(curl -s https://raw.githubusercontent.com/Neutron-Toolchains/antman/main/antman) \
+            --sync=19 -D ~/toolchain/neutron-clang
+          echo "Neutron Clang 19 downloaded."
+
+      - name: Export CLANG_PATH
+        run: |
+          if [ "${{ inputs.clang_variant }}" = "CLANG_12" ]; then
+            echo "CLANG_PATH=$HOME/toolchain/clang-12.0.1" >> $GITHUB_ENV
+          else
+            echo "CLANG_PATH=$HOME/toolchain/neutron-clang" >> $GITHUB_ENV
+          fi
 
       - name: Shallow-clone kernel source
         run: |
@@ -107,6 +139,9 @@ jobs:
 
       - name: Run build.sh
         working-directory: kernel
+        env:
+          CLANG_PATH: ${{ env.CLANG_PATH }}
+          CLANG_VARIANT: ${{ inputs.clang_variant }}
         run: |
           cp "$GITHUB_WORKSPACE/build.sh" .
           chmod +x build.sh
@@ -117,19 +152,19 @@ jobs:
           git clone --depth=1 https://github.com/XTENSEI/GrayRavens-anykernel anykernel
           cp kernel/out/arch/arm64/boot/Image anykernel/Image
           cd anykernel
-          zip -r9 "../${{ inputs.kernel_name }}-${{ inputs.ksu_variant }}.zip" . \
+          zip -r9 "../${{ inputs.kernel_name }}-${{ inputs.ksu_variant }}-${{ inputs.clang_variant }}.zip" . \
             --exclude="*.git*" --exclude="README.md" --exclude="*.placeholder"
 
       - name: Upload kernel image
         uses: actions/upload-artifact@v4
         with:
-          name: Image-${{ inputs.ksu_variant }}-${{ inputs.kernel_ref }}
+          name: Image-${{ inputs.ksu_variant }}-${{ inputs.clang_variant }}-${{ inputs.kernel_ref }}
           path: kernel/out/arch/arm64/boot/Image
           if-no-files-found: error
 
       - name: Upload flashable zip
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ inputs.kernel_name }}-${{ inputs.ksu_variant }}
-          path: ${{ inputs.kernel_name }}-${{ inputs.ksu_variant }}.zip
+          name: ${{ inputs.kernel_name }}-${{ inputs.ksu_variant }}-${{ inputs.clang_variant }}
+          path: ${{ inputs.kernel_name }}-${{ inputs.ksu_variant }}-${{ inputs.clang_variant }}.zip
           if-no-files-found: error
