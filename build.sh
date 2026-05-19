@@ -45,8 +45,6 @@ echo "Compiler string : $KBUILD_COMPILER_STRING"
 # -mtune=cortex-a55 : tune for little cores (handle most background work)
 # -w                : suppress warnings, keep log clean
 export KCFLAGS="-w -march=armv8.2-a -mtune=cortex-a55"
-export KBUILD_CFLAGS += -fno-reorder-blocks-and-partition
-export KBUILD_LDFLAGS += --emit-relocs
 
 # ── NTSYNC SELinux policy injection ─────────────────────────────────────────
 RULES_FILE="drivers/kernelsu/selinux/rules.c"
