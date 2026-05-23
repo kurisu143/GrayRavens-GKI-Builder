@@ -12,13 +12,13 @@ on:
           - ALL
         default: KWS
       clang_variant:
-        description: 'Clang toolchain (ALL = NEUTRON-19 + CLANG-12)'
+        description: 'Clang toolchain (ALL = YUKI-22 + CLANG-12)'
         type: choice
         options:
-          - NEUTRON-19
+          - YUKI-22
           - CLANG-12
           - ALL
-        default: NEUTRON-19
+        default: YUKI-22
       kernel_name:
         description: 'Kernel base name'
         type: string
@@ -46,7 +46,7 @@ jobs:
           fi
 
           if [ "${{ inputs.clang_variant }}" = "ALL" ]; then
-            echo 'clang_variants=["NEUTRON-19","CLANG-12"]' >> $GITHUB_OUTPUT
+            echo 'clang_variants=["YUKI-22","CLANG-12"]' >> $GITHUB_OUTPUT
           else
             echo 'clang_variants=["${{ inputs.clang_variant }}"]' >> $GITHUB_OUTPUT
           fi
@@ -70,31 +70,30 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             bc bison flex build-essential libssl-dev libelf-dev \
             cpio kmod rsync zip patch curl ca-certificates \
-            python3 python3-pip python3-lxml git wget binutils
+            python3 python3-pip python3-lxml git wget binutils zstd
 
-      # ── Neutron 19 ────────────────────────────────────────────────────────
-      - name: Download Neutron Clang 19
-        if: matrix.clang == 'NEUTRON-19'
+      # ── Yuki Clang 22 ─────────────────────────────────────────────────────
+      - name: Download Yuki Clang 22
+        if: matrix.clang == 'YUKI-22'
         run: |
-          mkdir -p ~/toolchain/neutron-clang
-          cd ~/toolchain/neutron-clang
-          curl -LO "https://raw.githubusercontent.com/Neutron-Toolchains/antman/main/antman"
-          chmod +x antman
-          ./antman -S=10032024
-          ./antman --patch=glibc
-          echo "Neutron Clang 19 ready."
+          mkdir -p ~/toolchain/yuki-clang
+          cd ~/toolchain/yuki-clang
+          curl -LO "https://usc1.contabostorage.com/ab57618a161b456a8d009c2e2de4a408:xperience/toolchains/yuki-clang-+bolt-20251211.tar.zst"
+          tar -I zstd -xf yuki-clang-+bolt-20251211.tar.zst --strip-components=1
+          rm -f yuki-clang-+bolt-20251211.tar.zst
+          echo "Yuki Clang 22 ready."
 
-      - name: Verify Neutron Clang optimizations
-        if: matrix.clang == 'NEUTRON-19'
+      - name: Verify Yuki Clang optimizations
+        if: matrix.clang == 'YUKI-22'
         run: |
           echo "=== Clang binary BOLT check ==="
-          readelf -S ~/toolchain/neutron-clang/bin/clang \
+          readelf -S ~/toolchain/yuki-clang/bin/clang \
             | grep -i "bolt\|llvm_bb" || echo "No BOLT sections found"
           echo "=== Clang build comment ==="
-          readelf -p .comment ~/toolchain/neutron-clang/bin/clang 2>/dev/null \
+          readelf -p .comment ~/toolchain/yuki-clang/bin/clang 2>/dev/null \
             | head -20 || echo "No .comment section"
           echo "=== PGO check ==="
-          strings ~/toolchain/neutron-clang/bin/clang \
+          strings ~/toolchain/yuki-clang/bin/clang \
             | grep -i "profdata\|pgo\|instrumented" | head -10 \
             || echo "No PGO strings found"
 
@@ -119,8 +118,8 @@ jobs:
       - name: Export CLANG_PATH
         run: |
           case "${{ matrix.clang }}" in
-            NEUTRON-19) echo "CLANG_PATH=$HOME/toolchain/neutron-clang" >> $GITHUB_ENV ;;
-            CLANG-12)   echo "CLANG_PATH=$HOME/toolchain/aosp-clang-r416183b" >> $GITHUB_ENV ;;
+            YUKI-22)   echo "CLANG_PATH=$HOME/toolchain/yuki-clang" >> $GITHUB_ENV ;;
+            CLANG-12)  echo "CLANG_PATH=$HOME/toolchain/aosp-clang-r416183b" >> $GITHUB_ENV ;;
           esac
 
       # ── Kernel source ─────────────────────────────────────────────────────
