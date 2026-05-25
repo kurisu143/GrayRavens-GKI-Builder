@@ -1,0 +1,404 @@
+name: Clang Optimization Checker
+
+on:
+  workflow_dispatch:
+    inputs:
+      clang_url:
+        description: "Clang tarball URL to test"
+        required: false
+        default: ""
+      clang_variant:
+        description: "Clang variant label (for display)"
+        required: false
+        default: "custom"
+
+jobs:
+  check-aosp-r536225:
+    name: "AOSP r536225 (clang 19)"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download & extract
+        run: |
+          mkdir -p clang
+          wget -q "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r536225.tar.gz" -O clang.tar.gz
+          tar xf clang.tar.gz -C clang
+      - name: Run checks
+        run: bash <(curl -fsSL https://raw.githubusercontent.com/XTENSEI/GrayRavens-GKI-Builder/master/check-clang.sh) ./clang
+        continue-on-error: true
+      - name: Inline check (fallback)
+        if: always()
+        run: |
+          CLANG=./clang/bin/clang
+          echo "=============================="
+          echo " AOSP clang-r536225 (clang 19)"
+          echo "=============================="
+          echo ""
+
+          echo "── Version ──────────────────────────────────────────"
+          $CLANG --version
+
+          echo ""
+          echo "── Optimization features ────────────────────────────"
+
+          # Polly
+          if $CLANG -mllvm -polly -x c /dev/null -o /dev/null 2>/dev/null; then
+            echo "  [✓] Polly          — polyhedral loop optimizer"
+          else
+            echo "  [✗] Polly          — not compiled in"
+          fi
+
+          # BOLT (check for llvm-bolt binary)
+          if [ -f ./clang/bin/llvm-bolt ]; then
+            echo "  [✓] BOLT           — $(./clang/bin/llvm-bolt --version 2>/dev/null | head -n1)"
+          else
+            echo "  [✗] BOLT           — binary not found"
+          fi
+
+          # LTO
+          if $CLANG -flto=thin -x c /dev/null -o /dev/null 2>/dev/null; then
+            echo "  [✓] ThinLTO        — supported"
+          else
+            echo "  [✗] ThinLTO        — not supported"
+          fi
+          if $CLANG -flto=full -x c /dev/null -o /dev/null 2>/dev/null; then
+            echo "  [✓] Full LTO       — supported"
+          else
+            echo "  [✗] Full LTO       — not supported"
+          fi
+
+          # PGO
+          if $CLANG -fprofile-generate -x c /dev/null -o /dev/null 2>/dev/null; then
+            echo "  [✓] PGO            — profile generate supported"
+          else
+            echo "  [✗] PGO            — not supported"
+          fi
+
+          # MLGO — check for TFLite model embedded in binary
+          if strings ./clang/bin/clang 2>/dev/null | grep -q "MLGOHeuristic\|mlgo\|tflite\|regalloc_model"; then
+            echo "  [✓] MLGO           — TFLite model embedded in binary"
+          else
+            echo "  [✗] MLGO           — no embedded model found"
+          fi
+
+          # Sanitizers
+          if $CLANG -fsanitize=address -x c /dev/null -o /dev/null 2>/dev/null; then
+            echo "  [✓] ASan           — address sanitizer supported"
+          else
+            echo "  [✗] ASan           — not supported"
+          fi
+
+          # O3
+          if $CLANG -O3 -x c /dev/null -o /dev/null 2>/dev/null; then
+            echo "  [✓] O3             — supported"
+          else
+            echo "  [✗] O3             — not supported"
+          fi
+
+          # AArch64 ISA extensions
+          echo ""
+          echo "── AArch64 ISA support ──────────────────────────────"
+          for feat in armv8.2-a armv8.2-a+dotprod armv8.2-a+fp16 armv8.2-a+crypto armv8.2-a+crypto+fp16+dotprod; do
+            if $CLANG -march=$feat -x c /dev/null -o /dev/null 2>/dev/null; then
+              echo "  [✓] -march=$feat"
+            else
+              echo "  [✗] -march=$feat"
+            fi
+          done
+
+          # Linker
+          echo ""
+          echo "── Linker ───────────────────────────────────────────"
+          if [ -f ./clang/bin/ld.lld ]; then
+            echo "  [✓] LLD            — $(./clang/bin/ld.lld --version 2>/dev/null | head -n1)"
+          else
+            echo "  [✗] LLD            — not found"
+          fi
+
+          # llvm-objcopy / llvm-strip
+          for tool in llvm-objcopy llvm-strip llvm-ar llvm-nm llvm-readelf; do
+            if [ -f ./clang/bin/$tool ]; then
+              echo "  [✓] $tool"
+            else
+              echo "  [✗] $tool — not found"
+            fi
+          done
+
+          echo ""
+          echo "────────────────────────────────────────────────────"
+          echo "Done."
+
+  check-aosp-r547379:
+    name: "AOSP r547379 (clang 20)"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download & extract
+        run: |
+          mkdir -p clang
+          wget -q "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r547379.tar.gz" -O clang.tar.gz
+          tar xf clang.tar.gz -C clang
+      - name: Run checks
+        if: always()
+        run: |
+          CLANG=./clang/bin/clang
+          echo "=============================="
+          echo " AOSP clang-r547379 (clang 20)"
+          echo "=============================="
+          echo ""
+
+          echo "── Version ──────────────────────────────────────────"
+          $CLANG --version
+
+          echo ""
+          echo "── Optimization features ────────────────────────────"
+
+          if $CLANG -mllvm -polly -x c /dev/null -o /dev/null 2>/dev/null; then
+            echo "  [✓] Polly          — polyhedral loop optimizer"
+          else
+            echo "  [✗] Polly          — not compiled in"
+          fi
+
+          if [ -f ./clang/bin/llvm-bolt ]; then
+            echo "  [✓] BOLT           — $(./clang/bin/llvm-bolt --version 2>/dev/null | head -n1)"
+          else
+            echo "  [✗] BOLT           — binary not found"
+          fi
+
+          if $CLANG -flto=thin -x c /dev/null -o /dev/null 2>/dev/null; then
+            echo "  [✓] ThinLTO        — supported"
+          else
+            echo "  [✗] ThinLTO        — not supported"
+          fi
+
+          if $CLANG -flto=full -x c /dev/null -o /dev/null 2>/dev/null; then
+            echo "  [✓] Full LTO       — supported"
+          else
+            echo "  [✗] Full LTO       — not supported"
+          fi
+
+          if $CLANG -fprofile-generate -x c /dev/null -o /dev/null 2>/dev/null; then
+            echo "  [✓] PGO            — profile generate supported"
+          else
+            echo "  [✗] PGO            — not supported"
+          fi
+
+          if strings ./clang/bin/clang 2>/dev/null | grep -q "MLGOHeuristic\|mlgo\|tflite\|regalloc_model"; then
+            echo "  [✓] MLGO           — TFLite model embedded in binary"
+          else
+            echo "  [✗] MLGO           — no embedded model found"
+          fi
+
+          if $CLANG -O3 -x c /dev/null -o /dev/null 2>/dev/null; then
+            echo "  [✓] O3             — supported"
+          else
+            echo "  [✗] O3             — not supported"
+          fi
+
+          echo ""
+          echo "── AArch64 ISA support ──────────────────────────────"
+          for feat in armv8.2-a armv8.2-a+dotprod armv8.2-a+fp16 armv8.2-a+crypto armv8.2-a+crypto+fp16+dotprod; do
+            if $CLANG -march=$feat -x c /dev/null -o /dev/null 2>/dev/null; then
+              echo "  [✓] -march=$feat"
+            else
+              echo "  [✗] -march=$feat"
+            fi
+          done
+
+          echo ""
+          echo "── Linker & tools ───────────────────────────────────"
+          if [ -f ./clang/bin/ld.lld ]; then
+            echo "  [✓] LLD            — $(./clang/bin/ld.lld --version 2>/dev/null | head -n1)"
+          else
+            echo "  [✗] LLD            — not found"
+          fi
+          for tool in llvm-objcopy llvm-strip llvm-ar llvm-nm llvm-readelf; do
+            if [ -f ./clang/bin/$tool ]; then
+              echo "  [✓] $tool"
+            else
+              echo "  [✗] $tool — not found"
+            fi
+          done
+
+          echo ""
+          echo "────────────────────────────────────────────────────"
+          echo "Done."
+
+  check-neutron-19:
+    name: "Neutron clang 19"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download & extract
+        run: |
+          mkdir -p clang
+          # Get latest Neutron clang 19 release
+          NEUTRON_URL=$(curl -s https://api.github.com/repos/Neutron-Toolchains/clang-build-catalogue/releases/latest \
+            | grep "browser_download_url" \
+            | grep "neutron-clang" \
+            | grep "tar.zst\|tar.gz" \
+            | head -n1 \
+            | cut -d '"' -f 4)
+          echo "Downloading: $NEUTRON_URL"
+          wget -q "$NEUTRON_URL" -O clang.tar.zst || wget -q "$NEUTRON_URL" -O clang.tar.gz
+          # Try zst first, fallback to gz
+          if file clang.tar.zst 2>/dev/null | grep -q "Zstandard"; then
+            apt-get install -y zstd -qq
+            tar -I zstd -xf clang.tar.zst -C clang
+          else
+            tar xf clang.tar.gz -C clang 2>/dev/null || true
+          fi
+      - name: Run checks
+        if: always()
+        run: |
+          CLANG=$(find ./clang -name "clang" -type f | head -n1)
+          echo "=============================="
+          echo " Neutron clang 19"
+          echo "=============================="
+          echo ""
+
+          echo "── Version ──────────────────────────────────────────"
+          $CLANG --version
+
+          echo ""
+          echo "── Optimization features ────────────────────────────"
+
+          if $CLANG -mllvm -polly -x c /dev/null -o /dev/null 2>/dev/null; then
+            echo "  [✓] Polly          — polyhedral loop optimizer"
+          else
+            echo "  [✗] Polly          — not compiled in"
+          fi
+
+          BOLT_BIN=$(find ./clang -name "llvm-bolt" -type f | head -n1)
+          if [ -n "$BOLT_BIN" ]; then
+            echo "  [✓] BOLT           — $($BOLT_BIN --version 2>/dev/null | head -n1)"
+          else
+            echo "  [✗] BOLT           — binary not found"
+          fi
+
+          if $CLANG -flto=thin -x c /dev/null -o /dev/null 2>/dev/null; then
+            echo "  [✓] ThinLTO        — supported"
+          else
+            echo "  [✗] ThinLTO        — not supported"
+          fi
+
+          if $CLANG -fprofile-generate -x c /dev/null -o /dev/null 2>/dev/null; then
+            echo "  [✓] PGO            — profile generate supported"
+          else
+            echo "  [✗] PGO            — not supported"
+          fi
+
+          if strings $CLANG 2>/dev/null | grep -q "MLGOHeuristic\|mlgo\|tflite\|regalloc_model"; then
+            echo "  [✓] MLGO           — TFLite model embedded in binary"
+          else
+            echo "  [✗] MLGO           — no embedded model found"
+          fi
+
+          if $CLANG -O3 -x c /dev/null -o /dev/null 2>/dev/null; then
+            echo "  [✓] O3             — supported"
+          else
+            echo "  [✗] O3             — not supported"
+          fi
+
+          echo ""
+          echo "── AArch64 ISA support ──────────────────────────────"
+          for feat in armv8.2-a armv8.2-a+dotprod armv8.2-a+fp16 armv8.2-a+crypto armv8.2-a+crypto+fp16+dotprod; do
+            if $CLANG -march=$feat -x c /dev/null -o /dev/null 2>/dev/null; then
+              echo "  [✓] -march=$feat"
+            else
+              echo "  [✗] -march=$feat"
+            fi
+          done
+
+          echo ""
+          echo "────────────────────────────────────────────────────"
+          echo "Done."
+
+  check-custom:
+    name: "Custom URL"
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.clang_url != '' }}
+    steps:
+      - name: Download & extract
+        run: |
+          mkdir -p clang
+          echo "Downloading: ${{ github.event.inputs.clang_url }}"
+          wget -q "${{ github.event.inputs.clang_url }}" -O clang.tar.gz
+          tar xf clang.tar.gz -C clang 2>/dev/null || true
+      - name: Run checks
+        if: always()
+        run: |
+          CLANG=$(find ./clang -name "clang" -type f | head -n1)
+          echo "=============================="
+          echo " ${{ github.event.inputs.clang_variant }}"
+          echo "=============================="
+          echo ""
+
+          echo "── Version ──────────────────────────────────────────"
+          $CLANG --version
+
+          echo ""
+          echo "── Optimization features ────────────────────────────"
+
+          if $CLANG -mllvm -polly -x c /dev/null -o /dev/null 2>/dev/null; then
+            echo "  [✓] Polly          — polyhedral loop optimizer"
+          else
+            echo "  [✗] Polly          — not compiled in"
+          fi
+
+          BOLT_BIN=$(find ./clang -name "llvm-bolt" -type f | head -n1)
+          if [ -n "$BOLT_BIN" ]; then
+            echo "  [✓] BOLT           — $($BOLT_BIN --version 2>/dev/null | head -n1)"
+          else
+            echo "  [✗] BOLT           — binary not found"
+          fi
+
+          if $CLANG -flto=thin -x c /dev/null -o /dev/null 2>/dev/null; then
+            echo "  [✓] ThinLTO        — supported"
+          else
+            echo "  [✗] ThinLTO        — not supported"
+          fi
+
+          if $CLANG -flto=full -x c /dev/null -o /dev/null 2>/dev/null; then
+            echo "  [✓] Full LTO       — supported"
+          else
+            echo "  [✗] Full LTO       — not supported"
+          fi
+
+          if $CLANG -fprofile-generate -x c /dev/null -o /dev/null 2>/dev/null; then
+            echo "  [✓] PGO            — profile generate supported"
+          else
+            echo "  [✗] PGO            — not supported"
+          fi
+
+          if strings $CLANG 2>/dev/null | grep -q "MLGOHeuristic\|mlgo\|tflite\|regalloc_model"; then
+            echo "  [✓] MLGO           — TFLite model embedded in binary"
+          else
+            echo "  [✗] MLGO           — no embedded model found"
+          fi
+
+          if $CLANG -O3 -x c /dev/null -o /dev/null 2>/dev/null; then
+            echo "  [✓] O3             — supported"
+          else
+            echo "  [✗] O3             — not supported"
+          fi
+
+          echo ""
+          echo "── AArch64 ISA support ──────────────────────────────"
+          for feat in armv8.2-a armv8.2-a+dotprod armv8.2-a+fp16 armv8.2-a+crypto armv8.2-a+crypto+fp16+dotprod; do
+            if $CLANG -march=$feat -x c /dev/null -o /dev/null 2>/dev/null; then
+              echo "  [✓] -march=$feat"
+            else
+              echo "  [✗] -march=$feat"
+            fi
+          done
+
+          echo ""
+          echo "── Linker & tools ───────────────────────────────────"
+          LLD_BIN=$(find ./clang -name "ld.lld" -type f | head -n1)
+          if [ -n "$LLD_BIN" ]; then
+            echo "  [✓] LLD            — $($LLD_BIN --version 2>/dev/null | head -n1)"
+          else
+            echo "  [✗] LLD            — not found"
+          fi
+
+          echo ""
+          echo "────────────────────────────────────────────────────"
+          echo "Done."
