@@ -199,7 +199,7 @@ jobs:
       - name: Set LOCALVERSION in gki_defconfig
         working-directory: kernel
         run: |
-          LOCALVER="-${{ inputs.kernel_name }}-${{ matrix.ksu }}"
+          LOCALVER="-${{ inputs.kernel_name }}"
           printf '\nCONFIG_LOCALVERSION="%s"\n' "$LOCALVER" \
             >> arch/arm64/configs/gki_defconfig
           echo "LOCALVERSION set to: $LOCALVER"
