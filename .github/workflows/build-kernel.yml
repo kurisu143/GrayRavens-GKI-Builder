@@ -11,7 +11,7 @@ on:
           - KSUN
           - VNL
           - ALL
-        default: KWS
+        default: KSUN
       clang_variant:
         description: 'Clang toolchain Selection'
         type: choice
@@ -21,11 +21,11 @@ on:
           - NEUTRON-19
           - CLANG-12
           - ALL
-        default: YUKI-22
+        default: NEUTRON-19
       kernel_name:
         description: 'Kernel base name'
         type: string
-        default: GrayRavens-Zenithed-V6.0
+        default: android12-9-00014-gf82f7360927e-ab14119954
       kernel_ref:
         description: 'kernel branch / tag / SHA to build'
         type: string
@@ -165,7 +165,7 @@ jobs:
             printf '\nCONFIG_KSU=y\nCONFIG_KSU_MANUAL_SU=n\nCONFIG_KSU_SUSFS=n\n' \
               >> arch/arm64/configs/gki_defconfig
           else
-            curl -LSs "https://raw.githubusercontent.com/pershoot/KernelSU-Next/dev-susfs/kernel/setup.sh" | bash -s dev-susfs
+            curl -LSs "https://raw.githubusercontent.com/kurisu143/KernelSU-Next/dev-susfs/kernel/setup.sh" | bash -s dev-susfs
             printf '\nCONFIG_KSU=y\nCONFIG_KSU_MANUAL_SU=n\nCONFIG_KSU_SUSFS=y\n' \
               >> arch/arm64/configs/gki_defconfig
           fi
